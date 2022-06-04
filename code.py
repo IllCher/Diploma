@@ -23,14 +23,8 @@ transform_train = transforms.Compose([
 transform_test = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-loader_tr = rplc.DataLoader(
-torchvision.datasets.CIFAR10("data/cifar",
-transform=transform_train),
- shuffle=True, batch_size=b_s)
-loader_te = rplc.DataLoader(
-torchvision.datasets.CIFAR10("data/cifar",
- train=False, transform=transform_test),
- batch_size=b_s)
+loader_tr = rplc.DataLoader(torchvision.datasets.CIFAR10("data/cifar",transform=transform_train, download = True),shuffle=True, batch_size=b_s)
+loader_te = rplc.DataLoader(torchvision.datasets.CIFAR10("data/cifar",train=False, transform=transform_test , download = True),batch_size=b_s)
 
 def train(epoch, model, opt):
     losses = []
@@ -82,9 +76,7 @@ class MYF(nn.Module):
         b_s = h.shape[0]
         tmp = g_outs
         unchangable = tuple(self.parameters())
-        adf_d_hidden, adfd_times, *adf_d_parameters = 
-        torch.autograd.grad((req_o,), (h, times) 
-        + unchangable, grad_outputs=(tmp))
+        adf_d_hidden, adfd_times, *adf_d_parameters = torch.autograd.grad((req_o,), (h, times) + unchangable, grad_outputs=(tmp))
         adf_d_parameters = concat([parameter_gradients.flatten() 
         for parameter_gradients in adf_d_parameters])
         adf_d_parameters = adf_d_parameters[None, :]
@@ -141,24 +133,20 @@ class Adjoint(torch.autograd.Function):
             adf_d_hidden = torch.zeros(bias, *shapes_h)
             adf_d_parameters = torch.zeros(bias, parameters_cnt)
             adfd_times = torch.zeros(bias, 1)
-            h_iter, grad_outs = aug_h_iter[:, :dimensions],
-            aug_h_iter[:,dimensions:2*dimensions]  
+            h_iter, grad_outs = aug_h_iter[:, :dimensions], aug_h_iter[:,dimensions:2*dimensions]  
             h_iter = h_iter.reshape(bias, *shapes_h)
             grad_outs = grad_outs.reshape(bias, *shapes_h)
             with torch.set_grad_enabled(True):
                 times_iter = times_iter.requires_grad_(True)
                 h_iter = h_iter.requires_grad_(True)
-                dadt = dynamics_f.compute_f_adf(h_iter, times_iter,
-                g_outs = grad_outs)
-                function_out, adf_d_hidden, adfd_times, 
-                adf_d_parameters = dadt
+                dadt = dynamics_f.compute_f_adf(h_iter, times_iter, g_outs = grad_outs)
+                function_out, adf_d_hidden, adfd_times, adf_d_parameters = dadt
                 adf_d_hidden = adf_d_hidden.to(h_iter)
                 adf_d_parameters = adf_d_parameters.to(h_iter)
                 adfd_times = adfd_times.to(h_iter)
             function_out = function_out.reshape(bias, dimensions)
             adf_d_hidden = adf_d_hidden.reshape(bias, dimensions) 
-            return concat((function_out, -adf_d_hidden, 
-            -adf_d_parameters, -adfd_times),dim=1)
+            return concat((function_out, -adf_d_hidden, -adf_d_parameters, -adfd_times),dim=1)
 
         dLdh = dLdh.reshape(max_time, bias, dimensions)
         
@@ -196,8 +184,7 @@ class Adjoint(torch.autograd.Function):
             :, None], 1, 2), f_iter[:, :, None])[:, 0]
             adjoint_h += dLdh_0
             adjoint_times[0] = adjoint_times[0] - dLdtimes_0
-        return adjoint_h.reshape(bias, *shapes_h), adjoint_times,
-        adjoint_p, None, None
+        return adjoint_h.reshape(bias, *shapes_h), adjoint_times, adjoint_p, None, None
 
 class HelperClass(nn.Module):
     def __init__(self, dynamics_f, ode_accuracy):
